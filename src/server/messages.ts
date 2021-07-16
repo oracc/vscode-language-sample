@@ -3,6 +3,8 @@ import { request } from 'http';
 import { createMultipart /*, createResponseMessage */} from './mime';
 import { parseString } from 'xml2js';
 import { ServerResult } from '../client/server_result';
+import * as vscode from 'vscode';
+import { log } from '../logger';
 
 /*
 1. Gather all the information for the message from the text (start with hardcoded)
@@ -48,40 +50,40 @@ export function validate(filename: string, project: string, text: string): Serve
     }
     const req = request(options);
     req.on('response', (res) => {
-        console.log("DONE");
+        log('info', "DONE");
 
         // DEBUG
-        console.log(`STATUS: ${res.statusCode}`);
-        console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
+        log('debug', `STATUS: ${res.statusCode}`);
+        log('debug', `HEADERS: ${JSON.stringify(res.headers)}`);
         res.setEncoding('utf8');
         if (res.statusCode !== 200) {
-            console.error(`Request failed! Status: ${res.statusCode}`);
+            vscode.window.showWarningMessage(`Request failed! Status: ${res.statusCode}`);
             res.resume(); // Apparently needed to free up memory if we don't read the data?
         }
         // Parse the response to get the response ID
         res.on('data', (chunk) => {
             responseID = getResponseCode(chunk);
-            console.log(responseID);
+            log('debug', responseID);
             // Wait until the server has prepared the response
             if (commandSuccessful(responseID, options.host)) {
-                console.log(`Request ${responseID} is done.`);
+                log('info', `Request ${responseID} is done.`);
                 // Send Response message
                 // let ourResponse = createResponseMessage(responseID);
                 // TODO continue...
             } else {
-                console.log('Unsuccessful getting response.')
+                log('error', 'Unsuccessful getting response.')
             }
             }
         );
     });
     // Time out after 5 seconds
     req.setTimeout(5000, () => {
-        console.log("No response from server within limit, giving up.");
+        log('info', "No response from server within limit, giving up.");
         req.destroy();
     });
     // DEBUG
     req.on('error', (err) => {
-        console.log(`ERROR! ${err.message}`);
+        log('error', `ERROR! ${err.message}`);
     })
 
     // We probably don't need this? It's to convert all line endings to \r\n because reasons (see Nammu)
@@ -91,14 +93,14 @@ export function validate(filename: string, project: string, text: string): Serve
     req.setHeader('Content-Length', Buffer.byteLength(body));
     // This is what Nammu sends
     // req.setHeader('Content-Length', 2779);
-    console.log(`byte length: ${Buffer.byteLength(body)}`);
-    console.log(`length: ${body.length}`);
+    log('info', `byte length: ${Buffer.byteLength(body)}`);
+    log('info', `length: ${body.length}`);
     req.write(body);
-    console.log(JSON.stringify(req.getHeaders()));
+    log('info', JSON.stringify(req.getHeaders()));
     req.end();
-    console.log('Sent message');
+    log('info', 'Sent message');
 
-    console.log(fullMessage.toString());
+    log('info', fullMessage.toString());
 
     //TODO this is just a placeholder
     return new ServerResult(oracc_log);
